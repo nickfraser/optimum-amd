@@ -12,6 +12,7 @@ from brevitas.graph.gptq import gptq_mode
 from brevitas_examples.common.generative.quantize import quantize_model
 from brevitas_examples.llm.llm_quant.equalize import apply_weight_equalization
 from brevitas_examples.llm.llm_quant.prepare_for_quantize import replace_mha_with_quantizable_layers
+from brevitas_examples.llm.llm_quant.ln_affine_merge import merge_layernorm_affine_params
 from tqdm import tqdm
 
 from optimum.exporters import TasksManager
@@ -123,13 +124,6 @@ class BrevitasQuantizer(OptimumQuantizer):
 
         dtype = next(iter(self.model.parameters())).dtype
 
-        # Insert standard MHA layers when performing fx based weight/activation equalization to avoid dealing
-        # with all the variability in HF implementations.
-        if quantization_config.replace_mha_with_quantizable:
-            logger.info("Replace HF MHA with quantizable variants...")
-            self.model = replace_mha_with_quantizable_layers(self.model, dtype)
-            logger.info("Replacing done.")
-
         if quantization_config.requires_fx_graph():
             forward_signature = inspect.signature(self.model.forward).parameters
             if all(
@@ -145,6 +139,19 @@ class BrevitasQuantizer(OptimumQuantizer):
                 model = symbolic_trace(self.model, input_names)
         else:
             model = self.model
+
+        # Needs to be applied before RMHA, because the affine merge only targets Linear layers
+        if quantization_config.apply_layernorm_affine_merge:
+            logger.info("Merging layernorm affine parameters into Linear layers...")
+            apply_layernorm_affine_merge(model, dtype)
+            logger.info("Merging done.")
+
+        # Insert standard MHA layers when performing fx based weight/activation equalization to avoid dealing
+        # with all the variability in HF implementations.
+        if quantization_config.replace_mha_with_quantizable:
+            logger.info("Replace HF MHA with quantizable variants...")
+            self.model = replace_mha_with_quantizable_layers(self.model, dtype)
+            logger.info("Replacing done.")
 
         # Because accelerate is not compatible with FX, we keep two versions of the Model
         # one with FX-traced, the other one not.
@@ -302,3 +309,9 @@ def apply_calibration(model: torch.nn.Module, dataset: List[Dict]) -> None:
 
     # Remove all accelerate hooks.
     remove_hooks(model)
+
+
+@torch.no_grad()
+def apply_layernorm_affine_merge(graph_model: torch.fx.GraphModule, dtype: Union[str, torch.dtype]) -> None:
+    with cast_to_float32(graph_model, dtype):
+        merge_layernorm_affine_params(graph_model)

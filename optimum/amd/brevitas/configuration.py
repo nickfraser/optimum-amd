@@ -77,6 +77,7 @@ class BrevitasQuantizationConfig:
     activations_group_size: Optional[int] = None
     activations_equalization: Literal[None, "layerwise", "cross_layer"] = "cross_layer"
     apply_weight_equalization: bool = False
+    apply_layernorm_affine_merge: bool = False
     apply_gptq: bool = False
     gptq_act_oder: Optional[bool] = None
 
@@ -99,4 +100,4 @@ class BrevitasQuantizationConfig:
             )
 
     def requires_fx_graph(self):
-        return self.activations_equalization == "cross_layer" or self.apply_weight_equalization
+        return self.activations_equalization == "cross_layer" or self.apply_weight_equalization or self.apply_layernorm_affine_merge
