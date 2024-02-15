@@ -74,7 +74,7 @@ def onnx_compute_perplexity(onnx_file, data, context_length: int, tokenizer, see
 
     return ppl
 
-onnx_file = "opt_quantized_onnx/model.onnx"
+onnx_file = "llm_quantized_onnx/model.onnx"
 model_name = "facebook/opt-125m"
 model_config = AutoConfig.from_pretrained(model_name)
 attention_head_size = int(model_config.hidden_size / model_config.num_attention_heads)
