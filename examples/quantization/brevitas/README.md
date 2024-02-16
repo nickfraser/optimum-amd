@@ -31,7 +31,3 @@ python quantize_llm.py --help
 ```
 
 Most options can be applied independently. For optimal results, we suggest using the `--activations-equalization layerwise --apply-gtpq`, but GPTQ may take a long time, depending on your available hardware.
-
-## RAM offloading
-
-If quantizing large models, we recommend using the option `--cpu-offload` to offload the model to RAM using [Accelerate](https://huggingface.co/docs/accelerate/index), which loads the model's submodules dynamically to GPU.
