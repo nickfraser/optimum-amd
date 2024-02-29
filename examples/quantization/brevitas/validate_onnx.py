@@ -2,20 +2,20 @@
 # Copyright 2023 The HuggingFace Team. All rights reserved.
 # Licensed under the MIT License.
 
+import random
 from argparse import ArgumentParser
 
-import random
 import numpy as np
-import onnx
 import onnxruntime as ort
 import torch
 import torch.nn as nn
 from tqdm import tqdm
-from transformers import AutoConfig
-from transformers import AutoTokenizer
 
 from optimum.amd import BrevitasQuantizationConfig
 from optimum.amd.brevitas.data_utils import get_dataset_for_model
+
+# from transformers import AutoConfig
+from transformers import AutoTokenizer
 
 
 @torch.no_grad()
@@ -24,8 +24,8 @@ def onnx_compute_perplexity(onnx_file, data, context_length: int, tokenizer, see
     np.random.seed(seed)
     torch.random.manual_seed(seed)
 
-    ort_sess = ort.InferenceSession(onnx_file, providers=['CPUExecutionProvider'])
-    #ort_sess = ort.InferenceSession(onnx_file, providers=['CUDAExecutionProvider'])
+    ort_sess = ort.InferenceSession(onnx_file, providers=["CPUExecutionProvider"])
+    # ort_sess = ort.InferenceSession(onnx_file, providers=['CUDAExecutionProvider'])
 
     cross_entropy_loss = nn.CrossEntropyLoss()
 
@@ -57,7 +57,7 @@ def onnx_compute_perplexity(onnx_file, data, context_length: int, tokenizer, see
                 else:
                     onnx_subsample[k] = subsample[k].cpu().numpy()
 
-            #lm_logits = model(**subsample)["logits"]
+            # lm_logits = model(**subsample)["logits"]
             onnx_out = ort_sess.run(["logits"], onnx_subsample)
             lm_logits = torch.tensor(onnx_out[0])
 
@@ -77,15 +77,16 @@ def onnx_compute_perplexity(onnx_file, data, context_length: int, tokenizer, see
 
     return ppl
 
+
 def main(args):
     return_val = {}
 
     onnx_file = f"{args.onnx_path}/model.onnx"
     model_name = args.model
-    model_config = AutoConfig.from_pretrained(args.model)
-    attention_head_size = int(model_config.hidden_size / model_config.num_attention_heads)
+    # model_config = AutoConfig.from_pretrained(args.model)
+    # attention_head_size = int(model_config.hidden_size / model_config.num_attention_heads)
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    qconfig = BrevitasQuantizationConfig() # Actual contents won't matter
+    qconfig = BrevitasQuantizationConfig()  # Actual contents won't matter
     validation_dataset = get_dataset_for_model(
         args.model,
         qconfig=qconfig,
@@ -97,11 +98,14 @@ def main(args):
         device="cpu",
         fuse_sequences=args.fuse_sequences,
     )
-    
-    perplexity = onnx_compute_perplexity(onnx_file, validation_dataset, context_length=args.seqlen // 2, tokenizer=tokenizer)
+
+    perplexity = onnx_compute_perplexity(
+        onnx_file, validation_dataset, context_length=args.seqlen // 2, tokenizer=tokenizer
+    )
     print(f"ONNX Perplexity: {perplexity}")
     return_val = {"onnx_ppl"}
-    
+    return return_val
+
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="Quantize LLMs from 🤗 Transformers with AMD Brevitas")
@@ -138,4 +142,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    return_val = main(args)
+    main(args)
