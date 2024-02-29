@@ -2,6 +2,8 @@
 # Copyright 2023 The HuggingFace Team. All rights reserved.
 # Licensed under the MIT License.
 
+from argparse import ArgumentParser
+
 import random
 import numpy as np
 import onnx
@@ -14,6 +16,7 @@ from transformers import AutoTokenizer
 
 from optimum.amd import BrevitasQuantizationConfig
 from optimum.amd.brevitas.data_utils import get_dataset_for_model
+
 
 @torch.no_grad()
 def onnx_compute_perplexity(onnx_file, data, context_length: int, tokenizer, seed: int = 0):
@@ -74,24 +77,65 @@ def onnx_compute_perplexity(onnx_file, data, context_length: int, tokenizer, see
 
     return ppl
 
-onnx_file = "llm_quantized_onnx/model.onnx"
-model_name = "facebook/opt-125m"
-model_config = AutoConfig.from_pretrained(model_name)
-attention_head_size = int(model_config.hidden_size / model_config.num_attention_heads)
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-config = BrevitasQuantizationConfig()
-num_samples = 128
-seqlen = 128
-validation_dataset = get_dataset_for_model(
-    model_name,
-    qconfig=config,
-    dataset_name="wikitext2",
-    tokenizer=tokenizer,
-    nsamples=num_samples,
-    seqlen=seqlen,
-    split="validation",
-)
+def main(args):
+    return_val = {}
 
-perplexity = onnx_compute_perplexity(onnx_file, validation_dataset, context_length=seqlen // 2, tokenizer=tokenizer)
+    onnx_file = f"{args.onnx_path}/model.onnx"
+    model_name = args.model
+    model_config = AutoConfig.from_pretrained(args.model)
+    attention_head_size = int(model_config.hidden_size / model_config.num_attention_heads)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    qconfig = BrevitasQuantizationConfig() # Actual contents won't matter
+    validation_dataset = get_dataset_for_model(
+        args.model,
+        qconfig=qconfig,
+        dataset_name="wikitext2",
+        tokenizer=tokenizer,
+        nsamples=args.nsamples,
+        seqlen=args.seqlen,
+        split="validation",
+        device="cpu",
+        fuse_sequences=args.fuse_sequences,
+    )
+    
+    perplexity = onnx_compute_perplexity(onnx_file, validation_dataset, context_length=args.seqlen // 2, tokenizer=tokenizer)
+    print(f"ONNX Perplexity: {perplexity}")
+    return_val = {"onnx_ppl"}
+    
 
-print(f"ONNX Perplexity: {perplexity}")
+if __name__ == "__main__":
+    parser = ArgumentParser(description="Quantize LLMs from 🤗 Transformers with AMD Brevitas")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="facebook/opt-125m",
+        help="Model checkpoint to quantize. Can either be a local path to a model folder, or a model on Hugging Face Hub. Example: facebook/opt-125m",
+    )
+    parser.add_argument(
+        "--seqlen",
+        type=int,
+        default=128,
+        help="Sequence length to use during calibration (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--nsamples",
+        type=int,
+        default=128,
+        help="Number of samples to use during calibration & validation (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--fuse-sequences",
+        action="store_true",
+        default=False,
+        help="Whether to merge the dataset sequences in case they are shorter than the requested number of samples per sequence. This is useful in case you would like to quantize or evaluate on long sequences (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--onnx-path",
+        type=str,
+        default="llm_quantized_onnx",
+        help="Location of the ONNX model (default: %(default)s)",
+    )
+
+    args = parser.parse_args()
+
+    return_val = main(args)
