@@ -108,7 +108,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser(description="Quantize LLMs from 🤗 Transformers with AMD Brevitas")
+    parser = ArgumentParser(description="Test perplexity of 🤗 Transformers models quantized with AMD Brevitas")
     parser.add_argument(
         "--model",
         type=str,
