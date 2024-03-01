@@ -103,7 +103,7 @@ def main(args):
         onnx_file, validation_dataset, context_length=args.seqlen // 2, tokenizer=tokenizer
     )
     print(f"ONNX Perplexity: {perplexity}")
-    return_val = {"onnx_ppl"}
+    return_val = {"onnx_perplexity": perplexity}
     return return_val
 
 
