@@ -119,13 +119,13 @@ if __name__ == "__main__":
         "--seqlen",
         type=int,
         default=128,
-        help="Sequence length to use during calibration (default: %(default)s).",
+        help="Sequence length to use during validation (default: %(default)s).",
     )
     parser.add_argument(
         "--nsamples",
         type=int,
         default=128,
-        help="Number of samples to use during calibration & validation (default: %(default)s).",
+        help="Number of samples to use during validation (default: %(default)s).",
     )
     parser.add_argument(
         "--fuse-sequences",
