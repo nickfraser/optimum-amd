@@ -86,7 +86,7 @@ def main(args):
     # model_config = AutoConfig.from_pretrained(args.model)
     # attention_head_size = int(model_config.hidden_size / model_config.num_attention_heads)
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    qconfig = BrevitasQuantizationConfig()  # Actual contents won't matter
+    qconfig = BrevitasQuantizationConfig(apply_weight_equalization=True)  # Actual contents won't matter, except we should enable FX
     validation_dataset = get_dataset_for_model(
         args.model,
         qconfig=qconfig,
