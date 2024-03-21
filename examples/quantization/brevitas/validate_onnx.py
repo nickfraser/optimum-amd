@@ -57,6 +57,28 @@ def onnx_compute_perplexity(onnx_file, data, context_length: int, tokenizer, see
                 else:
                     onnx_subsample[k] = subsample[k].cpu().numpy()
 
+            for inp in ort_sess.get_inputs():
+                name = inp.name
+                if name in onnx_subsample.keys():
+                    # Workaround for incorrect shape
+                    if "past_key_values" in name:
+                        expected_shape = (
+                            onnx_subsample[name].shape[0],
+                            inp.shape[1],
+                            onnx_subsample[name].shape[2],
+                            inp.shape[3],
+                        )
+                        if not expected_shape == onnx_subsample[name].shape:
+                            print(f"Warning: override {name} shape from {onnx_subsample[name].shape} to {expected_shape}")
+                            onnx_subsample[name] = torch.empty(size=expected_shape).cpu().numpy()
+                    continue
+                if name in subsample.keys():
+                    print(f"Warning: unknown key: {name} found.")
+                if name == "position_ids":
+                    print(f"Creating default {name} input")
+                    onnx_subsample[name] = torch.arange(start_index, end_index+1).unsqueeze(0).cpu().numpy()
+                    print(f"{name}: {onnx_subsample[name].shape}")
+
             # lm_logits = model(**subsample)["logits"]
             onnx_out = ort_sess.run(["logits"], onnx_subsample)
             lm_logits = torch.tensor(onnx_out[0])
