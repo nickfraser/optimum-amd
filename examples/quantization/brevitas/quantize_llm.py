@@ -20,6 +20,7 @@ def main(args):
         apply_bias_correction=args.apply_bias_correction,
         activations_equalization=args.activations_equalization,
         weights_symmetric=True,
+        layers_to_exclude=[],
         gpu_device_map=args.gpu_device_map,
         cpu_device_map=args.cpu_device_map,
     )
