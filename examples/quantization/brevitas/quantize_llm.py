@@ -22,6 +22,7 @@ def main(args):
         is_static=args.is_static,
         weights_symmetric=True,
         activations_symmetric=args.is_static,  # ONNX export only supports unsigned for dynamic quantization
+        layers_to_exclude=[],
         gpu_device_map=args.gpu_device_map,
         cpu_device_map=args.cpu_device_map,
     )
