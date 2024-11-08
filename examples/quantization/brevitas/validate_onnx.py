@@ -45,7 +45,8 @@ def onnx_compute_perplexity(onnx_file, data, context_length: int, tokenizer, see
                 subsample["past_key_values"] = sample["past_key_values"]
 
             # Add BOS token.
-            subsample["input_ids"][:, 0] = tokenizer.bos_token_id
+            if tokenizer.bos_token_id is not None:
+                subsample["input_ids"][:, 0] = tokenizer.bos_token_id
 
             # Put subsample on CPU
             onnx_subsample = {}
