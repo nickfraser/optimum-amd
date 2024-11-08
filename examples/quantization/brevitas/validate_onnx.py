@@ -110,6 +110,18 @@ def main(args):
     # attention_head_size = int(model_config.hidden_size / model_config.num_attention_heads)
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     qconfig = BrevitasQuantizationConfig(apply_weight_equalization=True)  # Actual contents won't matter, except we should enable FX
+    if args.calibration_perplexity:
+        calibration_dataset = get_dataset_for_model(
+            args.model,
+            qconfig=qconfig,
+            dataset_name="wikitext2",
+            tokenizer=tokenizer,
+            nsamples=args.nsamples,
+            seqlen=args.seqlen,
+            split="train",
+            device="cpu",
+            fuse_sequences=args.fuse_sequences,
+        )
     validation_dataset = get_dataset_for_model(
         args.model,
         qconfig=qconfig,
@@ -122,11 +134,16 @@ def main(args):
         fuse_sequences=args.fuse_sequences,
     )
 
+    if args.calibration_perplexity:
+        calibration_perplexity = onnx_compute_perplexity(
+            onnx_file, calibration_dataset, context_length=args.seqlen // 2, tokenizer=tokenizer
+        )
+        print(f"ONNX Calibration Perplexity: {calibration_perplexity}")
     perplexity = onnx_compute_perplexity(
         onnx_file, validation_dataset, context_length=args.seqlen // 2, tokenizer=tokenizer
     )
-    print(f"ONNX Perplexity: {perplexity}")
-    return_val = {"onnx_perplexity": perplexity}
+    print(f"ONNX Validation Perplexity: {perplexity}")
+    return_val = {"onnx_perplexity": perplexity, "onnx_calibration_perplexity": calibration_perplexity}
     return return_val
 
 
@@ -161,6 +178,12 @@ if __name__ == "__main__":
         type=str,
         default="llm_quantized_onnx",
         help="Location of the ONNX model (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--calibration-perplexity",
+        action="store_true",
+        default=False,
+        help="Whether to also calculate perplexity on the calibration set (default: %(default)s).",
     )
 
     args = parser.parse_args()
